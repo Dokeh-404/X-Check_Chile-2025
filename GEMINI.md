@@ -7,24 +7,22 @@ Este proyecto automatiza la descarga, desbloqueo, extracción y almacenamiento d
 - **Ambiente:** `padron-2025` (Python 3.12, Conda)
 - **Base de Datos:** DuckDB (almacenamiento ligero y rápido para ~15M de registros)
 
-### Fases de Ejecución:
-1.  **Fase 1 (Scraping):** Obtiene URLs de descarga desde el HTML del SERVEL.
-2.  **Fase 2 (Extracción):** Desbloquea PDFs (`pikepdf`) y extrae nombres mediante coordenadas (`PyMuPDF`).
-3.  **Fase 3 (Base de Datos):** Almacena la data estructurada en un archivo `.db`.
-4.  **Fase 4 (Pipeline):** Orquesta todo el proceso de forma secuencial, descargando y eliminando PDFs para optimizar el espacio.
+### Estructura de Directorios:
+- `data/raw/source.html`: Archivo fuente original del SERVEL.
+- `data/processed/`: Base de datos `.db` y archivos CSV finales.
+- `data/temp/`: Espacio para procesamiento temporal de PDFs.
+- `src/`: Código fuente del proyecto.
 
 ## Instrucciones para Agentes de IA
 
 1.  **Activación:** `conda activate padron-2025`
 2.  **Scripts en `src/`:**
-    - `scraper.py`: Genera el CSV inicial de URLs.
-    - `extractor.py`: Lógica de procesamiento de PDFs.
-    - `database.py`: Gestión de la base de datos DuckDB.
-    - `pipeline.py`: Ejecución masiva secuencial.
+    - `python src/scraper.py`: Procesa el HTML y genera `data/processed/padron_definitivo_2025.csv`.
+    - `python src/extractor.py`: Contiene la lógica de desbloqueo y extracción quirúrgica.
+    - `python src/database.py`: Inicializa y gestiona la base de datos DuckDB.
+    - `python src/pipeline.py`: Orquestador de descarga y extracción masiva.
 
-## Estructura de Directorios
-
-- `data/raw/`: Archivos fuente originales.
-- `data/processed/`: Base de datos y archivos CSV finales.
-- `data/temp/`: Espacio para procesamiento temporal de PDFs.
-- `src/`: Código fuente del proyecto.
+## Notas Técnicas
+- El desbloqueo utiliza `pikepdf` para eliminar restricciones de copia.
+- La extracción utiliza `PyMuPDF` (fitz) con coordenadas específicas para la columna "Nombre".
+- El pipeline descarga, procesa y elimina cada PDF para minimizar el uso de disco.
