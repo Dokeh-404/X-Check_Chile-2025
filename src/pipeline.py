@@ -7,9 +7,9 @@ from extractor import unlock_pdf, extract_names
 from database import setup_database, insert_many
 
 # Directorios de trabajo
-TEMP_RAW = os.path.join("..", "data", "temp", "current_raw.pdf")
-TEMP_UNLOCKED = os.path.join("..", "data", "temp", "current_unlocked.pdf")
-CSV_SOURCE = os.path.join("..", "data", "processed", "padron_definitivo_2025.csv")
+TEMP_RAW = os.path.join("data", "temp", "current_raw.pdf")
+TEMP_UNLOCKED = os.path.join("data", "temp", "current_unlocked.pdf")
+CSV_SOURCE = os.path.join("data", "processed", "padron_definitivo_2025.csv")
 
 def run_pipeline():
     """(Fase 4) Orquestador principal de descargas y extracción secuencial."""

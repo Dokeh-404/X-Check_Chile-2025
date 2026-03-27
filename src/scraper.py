@@ -3,8 +3,8 @@ from bs4 import BeautifulSoup
 import os
 
 # Archivo de entrada y salida
-INPUT_FILE = os.path.join("..", "data", "raw", "source.html")
-OUTPUT_FILE = os.path.join("..", "data", "processed", "padron_definitivo_2025.csv")
+INPUT_FILE = os.path.join("data", "raw", "source.html")
+OUTPUT_FILE = os.path.join("data", "processed", "padron_definitivo_2025.csv")
 
 def extract_data():
     if not os.path.exists(INPUT_FILE):
