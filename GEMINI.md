@@ -1,38 +1,30 @@
-# Configuración del Proyecto: Padrón 2025
+# Proyecto: Padrón Electoral 2025 - Chile
 
-Este proyecto utiliza un ambiente de Miniconda para el procesamiento de datos del Padrón Electoral 2025 de Chile.
+Este proyecto automatiza la descarga, desbloqueo, extracción y almacenamiento del Padrón Electoral 2025 del SERVEL.
 
-## Ambiente Virtual
+## Arquitectura del Proyecto
 
-- **Nombre:** `padron-2025`
-- **Python:** 3.12 (estable)
-- **Gestor:** Conda/Miniconda
-- **Dependencias:** `pandas`, `beautifulsoup4`, `lxml` (Gestionadas vía `environment.yml`)
+- **Ambiente:** `padron-2025` (Python 3.12, Conda)
+- **Base de Datos:** DuckDB (almacenamiento ligero y rápido para ~15M de registros)
 
-## Scripts del Proyecto
-
-### 1. Extracción de Datos (`extract_padron.py`)
-Este script procesa el archivo HTML del SERVEL para generar un CSV con la región, comuna y enlace de descarga de cada padrón.
+### Fases de Ejecución:
+1.  **Fase 1 (Scraping):** Obtiene URLs de descarga desde el HTML del SERVEL.
+2.  **Fase 2 (Extracción):** Desbloquea PDFs (`pikepdf`) y extrae nombres mediante coordenadas (`PyMuPDF`).
+3.  **Fase 3 (Base de Datos):** Almacena la data estructurada en un archivo `.db`.
+4.  **Fase 4 (Pipeline):** Orquesta todo el proceso de forma secuencial, descargando y eliminando PDFs para optimizar el espacio.
 
 ## Instrucciones para Agentes de IA
 
-Si eres un agente de IA trabajando en este repositorio, sigue estas directrices:
+1.  **Activación:** `conda activate padron-2025`
+2.  **Scripts en `src/`:**
+    - `scraper.py`: Genera el CSV inicial de URLs.
+    - `extractor.py`: Lógica de procesamiento de PDFs.
+    - `database.py`: Gestión de la base de datos DuckDB.
+    - `pipeline.py`: Ejecución masiva secuencial.
 
-1.  **Activación:** Antes de ejecutar cualquier script de Python o instalar dependencias, asegúrate de activar el ambiente:
-    ```powershell
-    conda activate padron-2025
-    ```
-2.  **Instalación:** Si el ambiente no está configurado, usa:
-    ```powershell
-    conda env update -n padron-2025 -f environment.yml
-    ```
-3.  **Extracción:** Para actualizar el archivo CSV (`padron_definitivo_2025.csv`), ejecuta:
-    ```powershell
-    python extract_padron.py
-    ```
+## Estructura de Directorios
 
-## Estructura de Archivos Relevante
-
-- `Padrones Definitivos...html`: Archivo fuente de datos.
-- `extract_padron.py`: Script principal de procesamiento.
-- `environment.yml`: Configuración del ambiente conda.
+- `data/raw/`: Archivos fuente originales.
+- `data/processed/`: Base de datos y archivos CSV finales.
+- `data/temp/`: Espacio para procesamiento temporal de PDFs.
+- `src/`: Código fuente del proyecto.

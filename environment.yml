@@ -8,3 +8,6 @@ dependencies:
   - lxml
   - pandas
   - requests
+  - pikepdf
+  - pymupdf
+  - duckdb

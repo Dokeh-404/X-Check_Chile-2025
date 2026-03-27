@@ -32,5 +32,11 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# files
-padrones_descargados/
+# Project-specific: Ignorar datos temporales y bases de datos pesadas
+data/temp/*
+data/processed/*.db
+data/processed/*.csv
+!data/processed/.gitkeep
+
+# No ignorar la carpeta raw (contiene el source.html)
+!data/raw/source.html
