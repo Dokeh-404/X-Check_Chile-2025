@@ -7,6 +7,12 @@ Este proyecto utiliza un ambiente de Miniconda para el procesamiento de datos de
 - **Nombre:** `padron-2025`
 - **Python:** 3.12 (estable)
 - **Gestor:** Conda/Miniconda
+- **Dependencias:** `pandas`, `beautifulsoup4`, `lxml` (Gestionadas vía `environment.yml`)
+
+## Scripts del Proyecto
+
+### 1. Extracción de Datos (`extract_padron.py`)
+Este script procesa el archivo HTML del SERVEL para generar un CSV con la región, comuna y enlace de descarga de cada padrón.
 
 ## Instrucciones para Agentes de IA
 
@@ -16,10 +22,17 @@ Si eres un agente de IA trabajando en este repositorio, sigue estas directrices:
     ```powershell
     conda activate padron-2025
     ```
-2.  **Dependencias:** Si necesitas instalar nuevas librerías, utiliza `pip` dentro del ambiente activo y actualiza este documento si es necesario.
-3.  **Contexto del Proyecto:** El proyecto parece estar enfocado en analizar o extraer información de archivos HTML relacionados con los "Padrones Definitivos Elecciones 2025" del SERVEL (Servicio Electoral de Chile).
+2.  **Instalación:** Si el ambiente no está configurado, usa:
+    ```powershell
+    conda env update -n padron-2025 -f environment.yml
+    ```
+3.  **Extracción:** Para actualizar el archivo CSV (`padron_definitivo_2025.csv`), ejecuta:
+    ```powershell
+    python extract_padron.py
+    ```
 
 ## Estructura de Archivos Relevante
 
-- `Padrones Definitivos Elecciones 2025...html`: Archivo principal de datos/interfaz.
-- `Padrones Definitivos Elecciones 2025..._files/`: Recursos asociados al HTML.
+- `Padrones Definitivos...html`: Archivo fuente de datos.
+- `extract_padron.py`: Script principal de procesamiento.
+- `environment.yml`: Configuración del ambiente conda.

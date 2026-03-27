@@ -1,0 +1,10 @@
+name: padron-2025
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - beautifulsoup4
+  - lxml
+  - pandas
+  - requests

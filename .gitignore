@@ -32,3 +32,5 @@ ENV/
 .DS_Store
 Thumbs.db
 
+# files
+padrones_descargados/
