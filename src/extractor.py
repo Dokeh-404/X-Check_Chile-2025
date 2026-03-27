@@ -13,7 +13,7 @@ def unlock_pdf(input_path, output_path):
         print(f"Error al desbloquear: {e}")
         return False
 
-def extract_names(pdf_path, x_range=(75, 590), y_range=(350, 750)):
+def extract_names(pdf_path, x_range=(75, 590), y_range=(350, 750), max_pages=None):
     """(Fase 2) Extracción quirúrgica de nombres usando coordenadas y color negro."""
     doc = fitz.open(pdf_path)
     names = []
@@ -21,8 +21,10 @@ def extract_names(pdf_path, x_range=(75, 590), y_range=(350, 750)):
     # Palabras clave a excluir (basado en pruebas-fase2)
     EXCLUDE_KEYWORDS = ["NOMBRE", "REPÚBLICA DE CHILE", "SERVICIO ELECTORAL", "COMUNA", "CIRCUNSCRIPCIÓN"]
 
-    # for page_num in range(1):
-    for page_num in range(len(doc)):
+    total_pages = len(doc)
+    pages_to_process = min(total_pages, max_pages) if max_pages else total_pages
+
+    for page_num in range(pages_to_process):
         page = doc[page_num]
         blocks = page.get_text("dict")["blocks"]
         
