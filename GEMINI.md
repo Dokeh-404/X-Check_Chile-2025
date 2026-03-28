@@ -12,7 +12,13 @@ Este proyecto automatiza la descarga, desbloqueo, extracción y almacenamiento d
 2.  **`comunas`**: Almacena las 346 comunas, vinculadas a su región.
 3.  **`electores`**: Almacena los nombres de los electores, vinculados a su comuna (`comuna_id`).
 
-Este esquema permite realizar consultas complejas (ej: conteos por región, búsquedas por comuna) de forma extremadamente eficiente sobre los ~15M de registros.
+## Robustez y Recuperación de Fallos
+
+El pipeline (`src/pipeline.py`) incluye mecanismos de seguridad para procesos largos:
+
+- **Sistema de Checkpoints:** Antes de procesar una comuna, el script verifica si ya existen registros para ella en la base de datos. Si es así, la salta (`[SKIP]`), permitiendo reanudar el proceso desde donde quedó tras una interrupción.
+- **Atomicidad por Comuna:** La inserción en la base de datos se realiza en bloque solo después de que el PDF ha sido procesado por completo. Si el proceso falla a la mitad de un PDF, no se guarda información parcial, evitando datos corruptos.
+- **Gestión de Espacio:** Cada PDF se descarga, se procesa y se elimina inmediatamente para mantener un uso de disco mínimo.
 
 ## Instrucciones para Agentes de IA
 
@@ -21,22 +27,19 @@ Este esquema permite realizar consultas complejas (ej: conteos por región, bús
     - `python src/scraper.py`: Extrae URLs del HTML.
     - `python src/database.py`: Inicializa y puebla tablas maestras.
     - `python src/extractor.py`: Procesa PDFs (desbloqueo y extracción).
-    - `python src/pipeline.py`: Orquestador masivo relacional.
+    - `python src/pipeline.py`: Orquestador masivo con soporte para reanudación.
     - `python src/validate_all.py`: Valida el flujo completo para una comuna.
 
 ## Consultas de Ejemplo (SQL):
-Para validar datos en la consola de DuckDB:
 ```sql
--- ¿Cuántos electores hay en la Región de Valparaíso?
-SELECT count(*) 
-FROM electores e 
-JOIN comunas c ON e.comuna_id = c.id 
-JOIN regiones r ON c.region_id = r.id 
-WHERE r.nombre LIKE '%Valparaíso%';
+-- ¿Cuántos electores hay en total?
+SELECT count(*) FROM electores;
 
--- ¿Está Juan Pérez en San Antonio?
-SELECT e.nombre, c.nombre 
-FROM electores e 
-JOIN comunas c ON e.comuna_id = c.id 
-WHERE e.nombre ILIKE '%JUAN PEREZ%' AND c.nombre = 'San Antonio';
+-- ¿Cuántos electores hay por región?
+SELECT r.nombre, count(e.nombre) as total
+FROM electores e
+JOIN comunas c ON e.comuna_id = c.id
+JOIN regiones r ON c.region_id = r.id
+GROUP BY r.nombre
+ORDER BY total DESC;
 ```
