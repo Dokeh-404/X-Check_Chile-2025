@@ -4,7 +4,7 @@ import requests
 import time
 from scraper import extract_data as run_scraper
 from extractor import unlock_pdf, extract_names
-from database import setup_database, insert_many
+from database import setup_database, insert_electores_batch, get_comuna_id
 
 # Directorios de trabajo
 TEMP_RAW = os.path.join("data", "temp", "current_raw.pdf")
@@ -14,14 +14,14 @@ CSV_SOURCE = os.path.join("data", "processed", "padron_definitivo_2025.csv")
 def run_pipeline():
     """(Fase 4) Orquestador principal de descargas y extracción secuencial."""
     
-    # Asegurar base de datos inicializada
-    setup_database()
-
-    # Cargar CSV con URLs
+    # 1. Asegurar base de datos inicializada y poblada con Regiones y Comunas
     if not os.path.exists(CSV_SOURCE):
-        print(f"No existe el archivo de URLs {CSV_SOURCE}. Ejecuta scraper.py primero.")
-        return
+        print(f"Generando CSV de URLs inicial...")
+        run_scraper()
+    
+    setup_database(CSV_SOURCE)
 
+    # 2. Cargar CSV con URLs
     df = pd.read_csv(CSV_SOURCE)
     
     for idx, row in df.iterrows():
@@ -29,8 +29,11 @@ def run_pipeline():
         comuna = row["Comuna"]
         url = row["Enlace de Descarga"]
         
+        # Obtener el ID de la comuna en la base de datos
+        comuna_id = get_comuna_id(comuna, region)
+        
         print(f"--- PROCESANDO: {idx + 1}/{len(df)} ---")
-        print(f"Región: {region} | Comuna: {comuna}")
+        print(f"Región: {region} | Comuna: {comuna} (ID: {comuna_id})")
         
         try:
             # 1. Descargar
@@ -49,12 +52,12 @@ def run_pipeline():
                 print("Extrayendo nombres...")
                 names = extract_names(TEMP_UNLOCKED)
                 
-                # 4. Insertar en DB
+                # 4. Insertar en DB (Normalizada)
                 print(f"Cargando {len(names)} registros en la base de datos...")
-                records = [(n, region, comuna) for n in names]
-                insert_many(records)
+                records = [(n, comuna_id) for n in names]
+                insert_electores_batch(records)
                 
-                # 5. Limpieza (Fase 4: borrar PDF para ahorrar espacio)
+                # 5. Limpieza
                 os.remove(TEMP_RAW)
                 os.remove(TEMP_UNLOCKED)
                 print("¡Limpieza de archivos temporales completada!")
@@ -64,14 +67,12 @@ def run_pipeline():
 
         except Exception as e:
             print(f"Error procesando {comuna}: {e}")
-            # Continuar con el siguiente para no detener el proceso
             continue
         
-        # Pausa pequeña para no saturar el servidor del Servel
         time.sleep(1)
 
     print("--- PIPELINE FINALIZADO ---")
 
 if __name__ == "__main__":
-    # run_pipeline() # Descomentar para ejecutar el proceso masivo
-    print("Pipeline configurado. Ejecuta run_pipeline() para comenzar la carga masiva.")
+    # run_pipeline()
+    print("Pipeline relacional configurado. Ejecuta run_pipeline() para comenzar.")
