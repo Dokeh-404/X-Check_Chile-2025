@@ -1,45 +1,42 @@
 # Proyecto: Padrón Electoral 2025 - Chile
 
-Este proyecto automatiza la descarga, desbloqueo, extracción y almacenamiento del Padrón Electoral 2025 del SERVEL en una base de datos relacional.
+Este proyecto automatiza la descarga, desbloqueo, extracción y almacenamiento del Padrón Electoral 2025 del SERVEL en una base de datos relacional de alto rendimiento.
 
-## Arquitectura de Datos
+## Arquitectura de Datos (DuckDB)
 
-- **Ambiente:** `padron-2025` (Python 3.12, Conda)
-- **Base de Datos:** DuckDB (`data/processed/padron_definitivo.db`)
+- **`regiones`**: Maestros de las 16 regiones.
+- **`comunas`**: Maestros de las 346 comunas vinculadas a su región.
+- **`electores`**: ~15M de registros vinculados por `comuna_id`.
+- **`log_procesamiento`**: Tabla de auditoría que registra el éxito de cada extracción.
 
-### Modelo Relacional (3 Tablas):
-1.  **`regiones`**: Almacena las 16 regiones de Chile.
-2.  **`comunas`**: Almacena las 346 comunas, vinculadas a su región.
-3.  **`electores`**: Almacena los nombres de los electores, vinculados a su comuna (`comuna_id`).
+## Robustez y Validación de Integridad
 
-## Robustez y Recuperación de Fallos
+El sistema está diseñado para una ejecución única y masiva con garantías de seguridad:
 
-El pipeline (`src/pipeline.py`) incluye mecanismos de seguridad para procesos largos:
+- **Validación Cruzada (Double Check):** El script extrae el número de "Registros" oficial desde un área específica del PDF `(45, 50, 50, 105)` usando filtros de color negro. Este dato se compara en tiempo real con la cantidad de nombres extraídos.
+- **Sistema de Checkpoints:** Permite reanudar el proceso desde la última comuna exitosa en caso de interrupción.
+- **Atomicidad:** Las comunas se procesan íntegramente en memoria y se insertan en la DB solo al finalizar con éxito, evitando datos parciales.
+- **Gestión de Espacio:** Descarga, procesa y elimina cada PDF secuencialmente.
 
-- **Sistema de Checkpoints:** Antes de procesar una comuna, el script verifica si ya existen registros para ella en la base de datos. Si es así, la salta (`[SKIP]`), permitiendo reanudar el proceso desde donde quedó tras una interrupción.
-- **Atomicidad por Comuna:** La inserción en la base de datos se realiza en bloque solo después de que el PDF ha sido procesado por completo. Si el proceso falla a la mitad de un PDF, no se guarda información parcial, evitando datos corruptos.
-- **Gestión de Espacio:** Cada PDF se descarga, se procesa y se elimina inmediatamente para mantener un uso de disco mínimo.
+## Instrucciones de Uso
 
-## Instrucciones para Agentes de IA
+1.  **Ambiente:** `conda activate padron-2025`
+2.  **Scripts Principales:**
+    - `python src/scraper.py`: Genera el listado de URLs desde el HTML.
+    - `python src/pipeline.py`: Inicia la carga masiva (Revisar filtros de región en el código antes de ejecutar).
+    - `python src/db_shell.py`: Consola interactiva para consultas SQL.
+    - `python src/inspect_db.py`: Reporte rápido de salud de la base de datos.
 
-1.  **Activación:** `conda activate padron-2025`
-2.  **Scripts en `src/`:**
-    - `python src/scraper.py`: Extrae URLs del HTML.
-    - `python src/database.py`: Inicializa y puebla tablas maestras.
-    - `python src/extractor.py`: Procesa PDFs (desbloqueo y extracción).
-    - `python src/pipeline.py`: Orquestador masivo con soporte para reanudación.
-    - `python src/validate_all.py`: Valida el flujo completo para una comuna.
-
-## Consultas de Ejemplo (SQL):
+## Consultas de Auditoría (SQL)
+Para verificar la calidad de la extracción tras la carga:
 ```sql
--- ¿Cuántos electores hay en total?
-SELECT count(*) FROM electores;
-
--- ¿Cuántos electores hay por región?
-SELECT r.nombre, count(e.nombre) as total
-FROM electores e
-JOIN comunas c ON e.comuna_id = c.id
-JOIN regiones r ON c.region_id = r.id
-GROUP BY r.nombre
-ORDER BY total DESC;
+-- Verificar diferencias entre conteo oficial del PDF y extracción real
+SELECT 
+    c.nombre as comuna, 
+    l.registros_oficiales as oficial, 
+    l.registros_extraidos as extraidos,
+    (l.registros_extraidos - l.registros_oficiales) as diferencia
+FROM log_procesamiento l
+JOIN comunas c ON l.comuna_id = c.id
+WHERE diferencia != 0;
 ```

@@ -36,6 +36,18 @@ def setup_database(csv_source=None):
     );
     """)
 
+    # 4. Crear tabla de Log de Procesamiento (Auditoría)
+    con.execute("""
+    CREATE TABLE IF NOT EXISTS log_procesamiento (
+        comuna_id INTEGER PRIMARY KEY,
+        paginas INTEGER,
+        registros_extraidos INTEGER,
+        registros_oficiales INTEGER,
+        fecha_procesado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (comuna_id) REFERENCES comunas(id)
+    );
+    """)
+
     # Si se provee el CSV del scraper, poblamos las tablas maestras
     if csv_source and os.path.exists(csv_source):
         print("Poblando tablas maestras (Regiones y Comunas)...")
@@ -73,6 +85,16 @@ def insert_electores_batch(records):
     """Inserción masiva de electores vinculados por comuna_id."""
     con = duckdb.connect(DB_FILE)
     con.executemany("INSERT INTO electores VALUES (?, ?)", records)
+    con.close()
+
+def log_extraction_status(comuna_id, paginas, extraidos, oficiales):
+    """Guarda metadatos de auditoría para validar la extracción."""
+    con = duckdb.connect(DB_FILE)
+    con.execute("""
+        INSERT OR REPLACE INTO log_procesamiento 
+        (comuna_id, paginas, registros_extraidos, registros_oficiales) 
+        VALUES (?, ?, ?, ?)
+    """, [comuna_id, paginas, extraidos, oficiales])
     con.close()
 
 if __name__ == "__main__":
