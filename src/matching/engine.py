@@ -1,88 +1,80 @@
 import duckdb
+import pandas as pd
 import os
 import time
 
 DB_PATH = os.path.join("data", "processed", "padron_matching.db")
 BENEFICIARIOS_CSV = os.path.join("data", "processed", "beneficiarios_limpios.csv")
-RESULTS_CSV = os.path.join("reports", "matching_results.csv")
+REPORTS_DIR = "reports"
 
-def run_matching_engine():
+def run_layer_1():
     if not os.path.exists(DB_PATH) or not os.path.exists(BENEFICIARIOS_CSV):
         print("Error: Archivos de entrada no encontrados.")
         return
 
+    if not os.path.exists(REPORTS_DIR):
+        os.makedirs(REPORTS_DIR)
+
     con = duckdb.connect(DB_PATH)
     
-    print("Cargando datos de beneficiarios...")
+    print("Cargando beneficiarios...")
     con.execute(f"CREATE OR REPLACE VIEW beneficiarios_view AS SELECT * FROM read_csv_auto('{BENEFICIARIOS_CSV}')")
     
-    # Tabla para consolidar resultados
-    con.execute("""
-        CREATE OR REPLACE TABLE matching_final (
-            NOMBRE_USUARIO_ALPHA VARCHAR,
-            NOMBRE_LIMPIO VARCHAR,
-            match_nombre_padron VARCHAR,
-            comuna_id INTEGER,
-            capa_match INTEGER,
-            confianza VARCHAR
-        )
-    """)
-
-    # --- CAPA 1: MATCH EXACTO ---
-    print("Ejecutando Capa 1: Match Exacto...")
-    start = time.time()
-    con.execute("""
-        INSERT INTO matching_final
-        SELECT b.NOMBRE_USUARIO_ALPHA, b.NOMBRE_LIMPIO, e.nombre, e.comuna_id, 1, 'ALTA'
+    # Capa 1: Match Exacto
+    print("Ejecutando CAPA 1: MATCH EXACTO...")
+    start_time = time.time()
+    
+    layer_1_query = """
+    WITH Matches AS (
+        SELECT 
+            b.NOMBRE_USUARIO_ALPHA,
+            b.NOMBRE_LIMPIO,
+            r.nombre as region_full,
+            c.nombre as comuna_nombre
         FROM beneficiarios_view b
         JOIN electores e ON b.NOMBRE_LIMPIO = e.nombre
-    """)
-    c1_count = con.execute("SELECT count(*) FROM matching_final WHERE capa_match = 1").fetchone()[0]
-    print(f"Capa 1 completada: {c1_count} matches en {time.time()-start:.2f}s")
-
-    # --- CAPA 2 OPTIMIZADA: SUBCONJUNTO ORDENADO CON BLOQUEO ---
-    print("Ejecutando Capa 2: Subconjunto Ordenado (Optimizado con Índice)...")
-    start = time.time()
-    # Usamos string_split para sacar el primer apellido y filtrar rápido usando el índice idx_elector_nombre
-    con.execute("""
-        INSERT INTO matching_final
+        JOIN comunas c ON e.comuna_id = c.id
+        JOIN regiones r ON c.region_id = r.id
+    ),
+    Aggregated AS (
         SELECT 
-            b.NOMBRE_USUARIO_ALPHA, 
-            b.NOMBRE_LIMPIO, 
-            e.nombre, 
-            e.comuna_id, 
-            2, 
-            'MEDIA-ALTA'
-        FROM (
-            SELECT *, string_split(NOMBRE_LIMPIO, ' ')[1] as p_apellido 
-            FROM beneficiarios_view 
-            WHERE NOMBRE_LIMPIO NOT IN (SELECT NOMBRE_LIMPIO FROM matching_final)
-        ) b
-        JOIN electores e ON e.nombre LIKE (b.p_apellido || ' %')
-        WHERE e.nombre LIKE ('%' || replace(b.NOMBRE_LIMPIO, ' ', '%') || '%')
-        QUALIFY ROW_NUMBER() OVER(PARTITION BY b.NOMBRE_LIMPIO ORDER BY e.nombre) = 1
-    """)
-    c2_count = con.execute("SELECT count(*) FROM matching_final WHERE capa_match = 2").fetchone()[0]
-    print(f"Capa 2 completada: {c2_count} matches en {time.time()-start:.2f}s")
-
-    # --- REPORTE FINAL ---
-    total_b = con.execute("SELECT count(*) FROM beneficiarios_view").fetchone()[0]
-    total_m = con.execute("SELECT count(*) FROM matching_final").fetchone()[0]
+            NOMBRE_USUARIO_ALPHA,
+            NOMBRE_LIMPIO,
+            list_aggregate(list_sort(list_distinct(list_transform(
+                list(region_full || ' | ' || comuna_nombre), 
+                x -> split_part(x, ' - ', 1) || ' - ' || split_part(x, ' | ', 2)
+            ))), 'string_agg', '; ') as COMUNAS,
+            count(*) as COINCIDENCIAS
+        FROM Matches
+        GROUP BY NOMBRE_USUARIO_ALPHA, NOMBRE_LIMPIO
+    )
+    SELECT 
+        NOMBRE_USUARIO_ALPHA,
+        NOMBRE_LIMPIO,
+        COMUNAS,
+        COINCIDENCIAS,
+        '1: MATCH EXACTO' as CAPA,
+        '100%' as CONFIANZA
+    FROM Aggregated
+    """
     
-    print("\n" + "="*40)
-    print("REPORTE DE MATCHING (CAPAS 1 Y 2)")
-    print("="*40)
-    print(f"Total Beneficiarios:  {total_b:,}")
-    print(f"Matches Encontrados:  {total_m:,} ({(total_m/total_b)*100:.2f}%)")
-    print("-" * 40)
-    print(f"Capa 1 (Exacto):      {c1_count:,}")
-    print(f"Capa 2 (Subconjunto): {c2_count:,}")
-    print(f"Pendientes:           {total_b - total_m:,}")
-    print("="*40)
-
-    if not os.path.exists("reports"): os.makedirs("reports")
-    con.execute(f"COPY (SELECT * FROM matching_final) TO '{RESULTS_CSV}' (HEADER, DELIMITER ',')")
+    # Exportar a DataFrame para generar ambos formatos
+    df_layer_1 = con.execute(layer_1_query).df()
+    
+    # Rutas de archivos
+    base_name = "matching_results_layer_1"
+    csv_path = os.path.join(REPORTS_DIR, f"{base_name}.csv")
+    xlsx_path = os.path.join(REPORTS_DIR, f"{base_name}.xlsx")
+    
+    # Guardar CSV
+    df_layer_1.to_csv(csv_path, index=False, encoding='utf-8')
+    # Guardar Excel
+    df_layer_1.to_excel(xlsx_path, index=False)
+    
+    print(f"CAPA 1 finalizada. Se encontraron {len(df_layer_1)} matches en {time.time() - start_time:.2f}s.")
+    print(f"Resultados guardados en CSV y XLSX en la carpeta: {REPORTS_DIR}")
+    
     con.close()
 
 if __name__ == "__main__":
-    run_matching_engine()
+    run_layer_1()
