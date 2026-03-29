@@ -81,19 +81,23 @@ graph TD
 
 ## 📂 Estructura del Proyecto
 ```text
-/padron-2025
+/mega-get-download-url
 ├── data/
-│   ├── raw/                # HTML fuente del SERVEL
+│   ├── raw/                # HTML fuente del SERVEL y otros insumos
 │   ├── processed/          # Base de datos (.db) y CSV de URLs
 │   └── temp/               # Almacenamiento temporal de PDFs (auto-limpiable)
+├── docs/                   # Documentación adicional (metodología)
+├── reports/                # Reportes generados sobre la base de datos
 ├── src/
-│   ├── scraper.py          # Fase 1: Extracción de URLs
-│   ├── extractor.py        # Fase 2: Lógica de desbloqueo y PyMuPDF
-│   ├── database.py         # Fase 3: Gestión de esquema DuckDB
-│   ├── pipeline.py         # Fase 4: Orquestador masivo con checkpoints
-│   ├── db_shell.py         # Consola interactiva SQL
-│   └── inspect_db.py       # Reportes rápidos de salud de la DB
+│   ├── extraction/         # Módulos de orquestación y extracción
+│   │   ├── scraper.py      # Fase 1: Extracción de URLs desde HTML
+│   │   ├── extractor.py    # Fase 2: Lógica de desbloqueo y PyMuPDF
+│   │   ├── database.py     # Fase 3: Gestión de esquema DuckDB
+│   │   ├── pipeline.py     # Fase 4: Orquestador masivo con checkpoints
+│   │   └── generate_report.py # Reportes detallados de salud de la DB
+│   └── db_shell.py         # Consola interactiva SQL
 ├── environment.yml         # Configuración del ambiente Conda
+├── GEMINI.md               # Contexto específico para el asistente Gemini
 └── README.md
 ```
 
@@ -109,15 +113,19 @@ graph TD
 ## 💻 Uso
 1.  **Generar lista de comunas:**
     ```bash
-    python src/scraper.py
+    python src/extraction/scraper.py
     ```
 2.  **Iniciar carga masiva:**
     ```bash
-    python src/pipeline.py
+    python src/extraction/pipeline.py
     ```
 3.  **Consultar datos:**
     ```bash
     python src/db_shell.py
+    ```
+4.  **Generar reporte de salud:**
+    ```bash
+    python src/extraction/generate_report.py
     ```
 
 ## 🛡️ Robustez y Validación

@@ -22,10 +22,10 @@ El sistema está diseñado para una ejecución única y masiva con garantías de
 
 1.  **Ambiente:** `conda activate padron-2025`
 2.  **Scripts Principales:**
-    - `python src/scraper.py`: Genera el listado de URLs desde el HTML.
-    - `python src/pipeline.py`: Inicia la carga masiva (Revisar filtros de región en el código antes de ejecutar).
+    - `python src/extraction/scraper.py`: Genera el listado de URLs desde el HTML.
+    - `python src/extraction/pipeline.py`: Inicia la carga masiva (Revisar filtros de región en el código antes de ejecutar).
     - `python src/db_shell.py`: Consola interactiva para consultas SQL.
-    - `python src/inspect_db.py`: Reporte rápido de salud de la base de datos.
+    - `python src/extraction/generate_report.py`: Reporte completo de integridad y salud de la base de datos.
 
 ## Consultas de Auditoría (SQL)
 Para verificar la calidad de la extracción tras la carga:
