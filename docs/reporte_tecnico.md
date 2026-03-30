@@ -13,17 +13,53 @@ El proyecto surgió de la necesidad de consolidar y analizar la información del
 *   **Gestión de Base de Datos:** Se utilizó **DuckDB** como motor de almacenamiento columnar por su eficiencia extrema en consultas analíticas masivas sobre millones de filas.
 
 ### 2. Limpieza y Normalización
-*   **Estandarización:** Se convirtieron todos los nombres a mayúsculas, se eliminaron tildes, caracteres especiales y espacios múltiples.
+*   **Estandarización:** Se convirtieron todos los nombres a mayúsculas, se eliminaron tildes, caracteres especiales y espacios múltiples y se reemplazaron las N's por Ñ's.
 *   **Conectores:** Se implementó una lógica para ignorar conectores comunes ("DE", "DEL", "LA", "LAS") en las capas de matching fonético para evitar falsos positivos.
 
-### 3. Lógica de Cruce (Matching Heurístico)
-Se diseñó un sistema de búsqueda en "embudo" de 4 capas:
-*   **Capa 1 (Exacta):** Comparación directa de cadenas normalizadas (51% de éxito).
-*   **Capa 2 (Subconjunto):** Identificación de nombres completos contenidos dentro de otros registros, útil para casos de segundos apellidos omitidos (22.8% de éxito).
-*   **Capa 3 (Fonética):** Aplicación de algoritmos `Soundex` y `Double Metaphone` para capturar errores de digitación (0.27% de éxito).
-*   **Capa 4 (Fonética + Subconjunto):** Combinación de ambas técnicas para casos complejos (0.58% de éxito).
+## III. Arquitectura del Motor de Cruce (Matching Layered)
 
-## III. Desglose de Horas Invertidas (20 Horas)
+Se implementó una estrategia de **"embudo" (funnel)** para balancear la precisión (evitar falsos positivos) con la sensibilidad (encontrar casos difíciles). El motor procesa a los beneficiarios de forma secuencial, descartando a los ya identificados en cada paso.
+
+### 1. El Proceso en Capas (Criterios Técnicos)
+
+#### **Capa 1: Coincidencia Exacta (High Precision)**
+*   **Lógica:** Comparación `String to String` (normalizada).
+*   **Algoritmo:** `JOIN` directo en SQL.
+*   **Casos:** Registros sin errores tipográficos ni abreviaturas.
+*   **Confianza Asignada:** 100%.
+
+#### **Capa 2: Subconjunto Ordenado (Subset Matching)**
+*   **Lógica:** Identifica si el nombre de la lista de entrada está contenido íntegramente dentro de un registro del Padrón, respetando el orden.
+*   **Algoritmo:** Expresión regular dinámica (`LIKE` con wildcards). Ej: `JUAN % PEREZ` captura `JUAN ALBERTO PEREZ GOMEZ`.
+*   **Casos:** Omisión del segundo apellido o nombres intermedios en la lista de origen.
+*   **Confianza Asignada:** 90%.
+
+#### **Capa 3: Fonética Estricta (Phonetic Alignment)**
+*   **Lógica:** Busca nombres que suenen idéntico, manteniendo el mismo número de palabras.
+*   **Algoritmo:** `Double Metaphone` aplicado a cada palabra. Se requiere que la secuencia de códigos fonéticos sea idéntica.
+*   **Casos:** Errores comunes de ortografía (S/C/Z, V/B, H omitida, tildes).
+*   **Confianza Asignada:** 80%.
+
+#### **Capa 4: Fonética Subconjunto (Phonetic Subset)**
+*   **Lógica:** Combina la flexibilidad de la Capa 2 con la fonética de la Capa 3. Busca si los "sonidos" del nombre del beneficiario existen dentro de un nombre más largo en el Padrón.
+*   **Algoritmo:** Secuenciación de fonemas `Metaphone`.
+*   **Casos:** Nombres con faltas de ortografía y apellidos faltantes simultáneamente.
+*   **Confianza Asignada:** 70%.
+
+### 2. Por qué el enfoque en capas es crucial
+1.  **Reducción de Ruido:** Al identificar primero los casos obvios (Capas 1 y 2), reducimos el universo de búsqueda para los algoritmos fonéticos, que son más propensos a errores de "choque" (dos nombres distintos que suenan igual).
+2.  **Eficiencia Computacional:** Las capas iniciales se ejecutan en milisegundos mediante índices SQL en la base de datos, mientras que las capas fonéticas requieren procesamiento intensivo en Python palabra por palabra.
+3.  **Auditabilidad Periodística:** Cada resultado en el archivo final indica explícitamente en qué capa fue encontrado. Esto permite priorizar su validación: los resultados de Capa 1 son seguros para uso directo, mientras que los de Capa 4 requieren mayor escrutinio.
+
+### 3. Nota Crítica sobre la "Confianza"
+En los archivos Excel (`matching_results_layer_4.xlsx`), verán una columna de "Confianza" (70%, 80%, 100%). **Es vital entender que este porcentaje no es una verdad absoluta.**
+
+*   **(Capa 1):** Es casi imposible que sea un error, salvo que existan dos personas con el mismo nombre exacto (homonimia).
+*   **(Capa 2):** Podría ser un falso positivo, pero es poco probable. Lo más probable es que en el listado de búsqueda se haya omitido el segundo nombre o algún apellido.
+*   **(Capas 3 y 4):** Son **sugerencias de búsqueda**. Debido a que se basan en fonética, el sistema podría sugerir a un "Juan Pérez" cuando buscamos a un "Joan Pires". 
+*   **Recomendación:** Para cualquier hallazgo en las Capas 3 y 4 que sea crítico para una noticia, **se requiere validación manual o una segunda fuente de datos**. No se debe publicar un nombre de estas capas sin verificar que la comuna o el contexto coincidan.
+
+## IV. Desglose de Horas Invertidas (20 Horas)
 
 | Etapa | Actividad | Horas |
 | :--- | :--- | :---: |
@@ -39,16 +75,11 @@ Se diseñó un sistema de búsqueda en "embudo" de 4 capas:
     *   Errores ortográficos críticos en el origen de datos de entrada.
     *   Casos de homonimia parcial que no superaron los umbrales de confianza configurados.
     *   Nombres extremadamente truncados en el listado de origen.
-
-## V. Alcances y Limitaciones
-*   **Incluye:** Sistema automatizado de descarga, procesamiento completo nacional, base de datos DuckDB optimizada y reportes de matching exportables a Excel/CSV.
-*   **No incluye:** Actualización automática del padrón tras nuevas publicaciones del SERVEL (requiere ejecución manual del pipeline). Limitado a los campos de nombre y comuna de inscripción.
+    *   Beneficiarios que no pertenecen al padrón.
 
 ## VI. Entregables
-1.  **Base de Datos:** `data/processed/padron_definitivo_2025.db` (DuckDB).
-2.  **Reportes de Cruce:** `reports/matching_results_layer_1-4.xlsx`.
-3.  **Scripts de Procesamiento:** Carpeta `src/`.
-4.  **Documentación:** Carpeta `docs/`.
+1.  **Reportes de Cruce:** `matching_results_layer_1-4.xlsx`.
+2. **Reporte Técnico**: `reporte_tecnico.pdf`.
 
 ---
 *Reporte Técnico Final - Diego Prokes Herbage*
