@@ -1,36 +1,32 @@
 # Proyecto: Padrón Electoral 2025 - Chile
 
-Este proyecto automatiza la descarga, desbloqueo, extracción y almacenamiento del Padrón Electoral 2025 del SERVEL en una base de datos relacional de alto rendimiento.
+Este proyecto automatiza la descarga, desbloqueo, extracción y almacenamiento del Padrón Electoral 2025 del SERVEL en una base de datos relacional de alto rendimiento, junto con un sistema de cruce de datos (matching) para identificar beneficiarios específicos.
 
 ## Arquitectura de Datos (DuckDB)
 
 - **`regiones`**: Maestros de las 16 regiones.
 - **`comunas`**: Maestros de las 346 comunas vinculadas a su región.
-- **`electores`**: ~15M de registros vinculados por `comuna_id`.
+- **`electores`**: ~15.6M de registros vinculados por `comuna_id`.
 - **`log_procesamiento`**: Tabla de auditoría que registra el éxito de cada extracción.
 
 ## Robustez y Validación de Integridad
 
-El sistema está diseñado para una ejecución única y masiva con garantías de seguridad:
+El sistema está diseñado para una ejecución masiva con garantías de seguridad:
 
-- **Validación Cruzada (Double Check):** El script extrae el número de "Registros" oficial desde un área específica del PDF `(45, 50, 50, 105)` usando filtros de color negro. Este dato se compara en tiempo real con la cantidad de nombres extraídos.
-- **Sistema de Checkpoints:** Permite reanudar el proceso desde la última comuna exitosa en caso de interrupción.
-- **Atomicidad:** Las comunas se procesan íntegramente en memoria y se insertan en la DB solo al finalizar con éxito, evitando datos parciales.
-- **Gestión de Espacio:** Descarga, procesa y elimina cada PDF secuencialmente.
+- **Validación Cruzada (Double Check):** El script extrae el número de "Registros" oficial desde un área específica del PDF `(45, 50, 50, 105)`. Este dato se compara en tiempo real con la cantidad de nombres extraídos.
+- **Sistema de Checkpoints:** Permite reanudar el proceso desde la última comuna exitosa.
+- **Atomicidad:** Las comunas se procesan íntegramente en memoria y se insertan en la DB solo al finalizar con éxito.
 
 ## Estado del Proyecto
 
-### Fase 1: Matching Heurístico (Completado)
-- **Metodología:** Embudo de 4 capas (Exacto, Subconjunto, Fonética, Fonética Subset).
-- **Resultados:** ~78% de matches encontrados sobre 9,575 registros.
-- **Logros:** Limpieza profunda de la DB (15.6M filas), indexación y normalización de conectores.
+### Fase 1: Extracción y Matching Heurístico (Completado)
+- **Extracción:** 100% de las comunas procesadas (346/346) con un **99.9987%** de precisión (15.6M registros).
+- **Metodología de Matching:** Embudo de 4 capas (Exacto, Subconjunto Ordenado, Fonética Estricta, Fonética + Subconjunto).
+- **Resultados:** **74.64%** de matches encontrados (7,147 coincidencias sobre 9,575).
 
-### Fase 2: Matching Probabilístico (En Progreso)
-- **Objetivo:** Superar el 78% de éxito utilizando **Splink** (Modelo Fellegi-Sunter).
-- **Estrategia:** 
-  - Implementación de modelo probabilístico en DuckDB.
-  - Reporte basado en umbrales de confianza (>85%).
-  - Top 3 de candidatos probables por cada registro no exacto.
+### Fase 2: Matching Probabilístico con Splink (En Desarrollo / Experimental)
+- **Objetivo:** Implementar el modelo Fellegi-Sunter para mejorar el hallazgo de casos complejos.
+- **Estado:** Fase incompleta. Se ha explorado la integración de Splink con DuckDB para generar un ranking de candidatos por probabilidad, pero los resultados definitivos aún no han sido consolidados en los reportes finales.
 
 ## Instrucciones de Uso
 
@@ -38,16 +34,12 @@ El sistema está diseñado para una ejecución única y masiva con garantías de
 2.  **Scripts de Extracción:**
     - `python src/extraction/scraper.py`
     - `python src/extraction/pipeline.py`
-3.  **Scripts de Matching (Fase 1):**
-    - `python src/matching/prepare_db.py`
-    - `python src/matching/prepare_beneficiarios.py`
-    - `python src/matching/engine.py`
-4.  **Scripts de Matching (Fase 2 - Splink):**
-    - `python src/matching_splink/engine.py` (Próximamente)
-
+3.  **Scripts de Matching Heurístico:**
+    - `python src/matching_heuristic/engine.py`
+4.  **Scripts de Matching Splink (Experimental):**
+    - `python src/matching_splink/engine.py`
 
 ## Consultas de Auditoría (SQL)
-Para verificar la calidad de la extracción tras la carga:
 ```sql
 -- Verificar diferencias entre conteo oficial del PDF y extracción real
 SELECT 
