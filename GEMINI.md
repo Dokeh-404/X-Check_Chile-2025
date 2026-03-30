@@ -18,14 +18,33 @@ El sistema está diseñado para una ejecución única y masiva con garantías de
 - **Atomicidad:** Las comunas se procesan íntegramente en memoria y se insertan en la DB solo al finalizar con éxito, evitando datos parciales.
 - **Gestión de Espacio:** Descarga, procesa y elimina cada PDF secuencialmente.
 
+## Estado del Proyecto
+
+### Fase 1: Matching Heurístico (Completado)
+- **Metodología:** Embudo de 4 capas (Exacto, Subconjunto, Fonética, Fonética Subset).
+- **Resultados:** ~78% de matches encontrados sobre 9,575 registros.
+- **Logros:** Limpieza profunda de la DB (15.6M filas), indexación y normalización de conectores.
+
+### Fase 2: Matching Probabilístico (En Progreso)
+- **Objetivo:** Superar el 78% de éxito utilizando **Splink** (Modelo Fellegi-Sunter).
+- **Estrategia:** 
+  - Implementación de modelo probabilístico en DuckDB.
+  - Reporte basado en umbrales de confianza (>85%).
+  - Top 3 de candidatos probables por cada registro no exacto.
+
 ## Instrucciones de Uso
 
 1.  **Ambiente:** `conda activate padron-2025`
-2.  **Scripts Principales:**
-    - `python src/extraction/scraper.py`: Genera el listado de URLs desde el HTML.
-    - `python src/extraction/pipeline.py`: Inicia la carga masiva (Revisar filtros de región en el código antes de ejecutar).
-    - `python src/db_shell.py`: Consola interactiva para consultas SQL.
-    - `python src/extraction/generate_report.py`: Reporte completo de integridad y salud de la base de datos.
+2.  **Scripts de Extracción:**
+    - `python src/extraction/scraper.py`
+    - `python src/extraction/pipeline.py`
+3.  **Scripts de Matching (Fase 1):**
+    - `python src/matching/prepare_db.py`
+    - `python src/matching/prepare_beneficiarios.py`
+    - `python src/matching/engine.py`
+4.  **Scripts de Matching (Fase 2 - Splink):**
+    - `python src/matching_splink/engine.py` (Próximamente)
+
 
 ## Consultas de Auditoría (SQL)
 Para verificar la calidad de la extracción tras la carga:
